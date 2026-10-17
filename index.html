@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#4338ca">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+*{font-family:'Plus Jakarta Sans',-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+input,select,textarea{user-select:text}
+.no-sb::-webkit-scrollbar{display:none}.no-sb{-ms-overflow-style:none;scrollbar-width:none}
+.card{background:#fff;border:1px solid rgba(226,232,240,.9);border-radius:1.25rem;box-shadow:0 4px 18px -2px rgba(15,23,42,.05)}
+.inp{width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:.85rem;padding:.65rem .85rem;font-size:.875rem;font-weight:600;color:#1e293b;outline:none}
+.inp:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+.lbl{display:block;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:.25rem}
+#barcode-reader video{border-radius:1rem;object-fit:cover}
+body.dark-mode{background:#0b0f19!important;color:#f1f5f9!important}
+body.dark-mode .card,body.dark-mode .modal-box{background:#151c2c!important;border-color:#263147!important;color:#f1f5f9!important}
+body.dark-mode .inp{background:#0b0f19!important;border-color:#263147!important;color:#f8fafc!important}
+body.dark-mode .text-slate-800,body.dark-mode .text-slate-700{color:#f1f5f9!important}
+body.dark-mode .text-slate-500,body.dark-mode .text-slate-400{color:#94a3b8!important}
+body.dark-mode .bg-slate-50,body.dark-mode .bg-slate-100{background:#0b0f19!important;border-color:#263147!important}
+body.dark-mode #bottomDock{background:rgba(21,28,44,.95)!important;border-color:#263147!important}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-28" oncontextmenu="return false;">
+
+<!-- NOTIFICAÇÃO FLUTUANTE (TOAST) -->
+<div id="toastBox" class="fixed top-4 left-1/2 -translate-x-1/2 z-[120] hidden bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl border border-white/15 flex items-center gap-2">
+    <span id="toastText"></span>
+</div>
+
+<!-- CAIXA DE DIÁLOGO E EDIÇÃO INTERNA -->
+<div id="dialogModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[110] hidden flex items-center justify-center p-4">
+    <div class="modal-box bg-white w-full max-w-xs rounded-3xl p-5 shadow-2xl space-y-3.5">
+        <h3 id="dialogTitle" class="font-extrabold text-base text-slate-800"></h3>
+        <p id="dialogMsg" class="text-xs text-slate-500 leading-relaxed"></p>
+        <input type="text" id="dialogInput" step="any" class="inp hidden">
+        <div class="flex gap-2 pt-1">
+            <button type="button" id="dialogCancelBtn" class="flex-1 bg-slate-100 text-slate-600 text-xs font-bold py-2.5 rounded-xl">Cancelar</button>
+            <button type="button" id="dialogOkBtn" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-xl">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- TELA DE BLOQUEIO POR PIN -->
+<div id="pinLockScreen" class="fixed inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-violet-950 text-white z-[100] hidden flex flex-col items-center justify-center p-6">
+    <div class="w-full max-w-xs text-center space-y-5">
+        <div class="mx-auto w-14 h-14 bg-white/10 border border-white/15 rounded-2xl flex items-center justify-center"><i data-lucide="lock" class="w-7 h-7 text-indigo-300"></i></div>
+        <div><h2 class="text-xl font-extrabold" id="lockFamilyTitle">BabyFinance Pro</h2><p class="text-xs text-indigo-300 mt-1">Digite seu PIN de 4 dígitos</p></div>
+        <div class="flex justify-center gap-4 my-2" id="pinDotsBox"></div>
+        <p id="pinErrorMsg" class="text-xs font-bold text-rose-400 h-4"></p>
+        <div class="grid grid-cols-3 gap-2.5 max-w-[230px] mx-auto" id="pinPadGrid"></div>
+    </div>
+</div>
+
+<input type="file" id="productPhotoInput" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="childPhotoInput" accept="image/*" class="hidden">
+
+<div class="max-w-md mx-auto min-h-screen flex flex-col">
+
+    <!-- CABEÇALHO -->
+    <header class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white p-5 rounded-b-[2rem] shadow-xl sticky top-0 z-20">
+        <div class="flex justify-between items-center mb-4">
+            <div data-action="open-settings" class="flex items-center gap-2.5 cursor-pointer min-w-0">
+                <div id="headerChildAvatar" class="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center overflow-hidden flex-shrink-0 text-xl shadow-sm">👶</div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1"><h1 id="headerChildName" class="font-extrabold text-base leading-tight truncate">Meu Bebê</h1><i data-lucide="chevron-down" class="w-3.5 h-3.5 text-indigo-200"></i></div>
+                    <p id="headerChildAge" class="text-[11px] text-indigo-200 truncate">Toque para perfil</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button type="button" data-action="share-whatsapp" title="Enviar Resumo no WhatsApp" class="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 rounded-xl border border-white/20 active:scale-95 transition"><i data-lucide="share-2" class="w-4 h-4"></i></button>
+                <input type="month" id="monthFilter" class="bg-white/15 text-white text-xs font-bold px-2.5 py-2 rounded-xl border border-white/20 focus:outline-none">
+                <button type="button" data-action="open-settings" title="Configurações" class="bg-white/15 hover:bg-white/25 text-white p-2.5 rounded-xl border border-white/20 active:scale-95 transition"><i data-lucide="settings" class="w-4 h-4"></i></button>
+            </div>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-[10px] text-indigo-100 uppercase tracking-wider font-extrabold">Gasto no Mês (<span id="budgetChildLabel">Bebê</span>)</span>
+                <button type="button" data-action="edit-budget" class="text-[11px] text-indigo-100 hover:text-white flex items-center gap-1 font-semibold bg-white/10 px-2 py-0.5 rounded-lg">Meta: <span id="budgetDisplay">R$ 1.500,00</span> <i data-lucide="pencil" class="w-2.5 h-2.5"></i></button>
+            </div>
+            <div class="flex justify-between items-baseline mb-2.5">
+                <div class="text-3xl font-extrabold tracking-tight" id="totalSpentDisplay">R$ 0,00</div>
+                <span id="momBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/15 text-indigo-100">Mês atual</span>
+            </div>
+            <div class="w-full bg-slate-950/40 rounded-full h-2 mb-2 overflow-hidden">
+                <div id="budgetBar" class="bg-emerald-400 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-indigo-100 font-semibold">
+                <span id="budgetPercentDisplay">0% da meta</span>
+                <span id="forecastDisplay">Projeção: R$ 0,00</span>
+                <span id="dailyAvgDisplay">R$ 0/dia</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 p-4 space-y-4">
+
+        <!-- ABA 1: DASHBOARD -->
+        <section id="tab-dashboard" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div data-action="switch-tab" data-tab="diapers" class="card p-3.5 cursor-pointer active:scale-98 transition">
+                    <div class="flex justify-between items-center mb-1"><span class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-base">🧷</span><span id="dashDiaperAlert" class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">OK</span></div>
+                    <h3 class="font-extrabold text-xs text-slate-800 mt-1">Estoque Fraldas</h3>
+                    <p class="text-[11px] text-slate-500 font-medium truncate" id="dashDiaperSummary">0 tiras</p>
+                </div>
+                <div data-action="switch-tab" data-tab="growth" class="card p-3.5 cursor-pointer active:scale-98 transition">
+                    <div class="flex justify-between items-center mb-1"><span class="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-base">📏</span><span id="dashGrowthSuggestedSize" class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Biometria</span></div>
+                    <h3 class="font-extrabold text-xs text-slate-800 mt-1">Peso & Altura</h3>
+                    <p class="text-[11px] text-slate-500 font-medium truncate" id="dashGrowthSummary">Sem registro</p>
+                </div>
+            </div>
+
+            <!-- FERRAMENTAS + ATALHOS DE 1 TOQUE RESTAURADOS -->
+            <div>
+                <h2 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-2 px-1">Ferramentas & Lançamento Rápido</h2>
+                <div class="flex gap-2 overflow-x-auto no-sb pb-1">
+                    <button type="button" data-action="open-scan" class="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm px-3.5 py-2.5 rounded-2xl flex items-center gap-2 active:scale-95 transition">
+                        <i data-lucide="scan-barcode" class="w-4 h-4"></i>
+                        <div class="text-left"><p class="text-xs font-extrabold leading-none">Ler Código</p><p class="text-[9px] text-emerald-100 mt-0.5">Scanner + Foto</p></div>
+                    </button>
+                    <button type="button" data-action="open-diaper-modal" class="flex-shrink-0 bg-indigo-50 border border-indigo-200 px-3.5 py-2.5 rounded-2xl flex items-center gap-2 active:scale-95 transition">
+                        <span class="text-base">🧷</span>
+                        <div class="text-left"><p class="text-xs font-extrabold text-indigo-900 leading-none">+ Pacote Fralda</p><p class="text-[9px] text-indigo-500 mt-0.5">Estoque & Gasto</p></div>
+                    </button>
+                    <button type="button" data-action="open-comparator" class="flex-shrink-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm px-3.5 py-2.5 rounded-2xl flex items-center gap-2 active:scale-95 transition">
+                        <i data-lucide="scale" class="w-4 h-4"></i>
+                        <div class="text-left"><p class="text-xs font-extrabold leading-none">Comparar</p><p class="text-[9px] text-amber-100 mt-0.5">Qual Compensa?</p></div>
+                    </button>
+                    <button type="button" data-action="open-sos-modal" class="flex-shrink-0 bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-sm px-3.5 py-2.5 rounded-2xl flex items-center gap-2 active:scale-95 transition">
+                        <i data-lucide="thermometer" class="w-4 h-4"></i>
+                        <div class="text-left"><p class="text-xs font-extrabold leading-none">SOS Febre</p><p class="text-[9px] text-rose-100 mt-0.5">Dose por Peso</p></div>
+                    </button>
+                    <button type="button" data-action="preset-expense" data-cat="Fraldas & Higiene" data-desc="Lenço Umedecido" class="flex-shrink-0 card px-3.5 py-2.5 flex items-center gap-2 active:scale-95 transition">
+                        <span class="text-base">🧻</span>
+                        <div class="text-left"><p class="text-xs font-extrabold text-slate-800 leading-none">Lenços</p><p class="text-[9px] text-slate-400 mt-0.5">Higiene</p></div>
+                    </button>
+                    <button type="button" data-action="preset-expense" data-cat="Alimentação" data-desc="Fórmula / Leite" class="flex-shrink-0 card px-3.5 py-2.5 flex items-center gap-2 active:scale-95 transition">
+                        <span class="text-base">🍼</span>
+                        <div class="text-left"><p class="text-xs font-extrabold text-slate-800 leading-none">Fórmula</p><p class="text-[9px] text-slate-400 mt-0.5">Alimentação</p></div>
+                    </button>
+                    <button type="button" data-action="preset-expense" data-cat="Saúde & Farmácia" data-desc="Medicamento / Farmácia" class="flex-shrink-0 card px-3.5 py-2.5 flex items-center gap-2 active:scale-95 transition">
+                        <span class="text-base">💊</span>
+                        <div class="text-left"><p class="text-xs font-extrabold text-slate-800 leading-none">Remédio</p><p class="text-[9px] text-slate-400 mt-0.5">Saúde</p></div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="card p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-xl" id="topCatIcon">📊</div>
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">Maior Gasto do Mês</span>
+                        <h3 class="font-extrabold text-slate-800 text-sm" id="topCatName">Sem registros</h3>
+                        <p class="text-xs text-slate-500" id="topCatValue">Toque no (+) para lançar</p>
+                    </div>
+                </div>
+                <span class="bg-indigo-50 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-xl" id="topCatShare">0%</span>
+            </div>
+
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-extrabold text-xs uppercase tracking-wider text-slate-500">Distribuição por Categoria</h3>
+                    <span class="text-[10px] font-bold text-slate-400">Visão Mensal</span>
+                </div>
+                <div class="relative h-52 flex items-center justify-center">
+                    <canvas id="doughnutChart"></canvas>
+                    <div id="emptyChartMsg" class="hidden absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-xs"><i data-lucide="pie-chart" class="w-8 h-8 mb-1 stroke-1"></i>Sem gastos neste mês</div>
+                </div>
+            </div>
+
+            <div class="card p-4">
+                <h3 class="font-extrabold text-xs uppercase tracking-wider text-slate-500 mb-3">Ranking de Despesas</h3>
+                <div id="categoryRankingList" class="space-y-2.5"></div>
+            </div>
+        </section>
+
+        <!-- ABA 2: FRALDAS -->
+        <section id="tab-diapers" class="hidden space-y-4">
+            <div class="card p-5">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">Saldo Físico Atual</span>
+                        <div class="flex items-baseline gap-2 mt-0.5"><span id="diaperStockCount" class="text-4xl font-extrabold text-slate-800">0</span><span class="text-xs font-semibold text-slate-400">tiras disponíveis</span></div>
+                    </div>
+                    <button type="button" data-action="manual-stock" class="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700">Ajustar Saldo</button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 mb-4">
+                    <div><p class="text-[10px] font-bold text-slate-400 uppercase">Duração</p><p id="diaperDaysLeft" class="text-sm font-extrabold text-slate-800 mt-0.5">0 dias</p></div>
+                    <div><p class="text-[10px] font-bold text-slate-400 uppercase">Acaba em</p><p id="diaperEndDate" class="text-sm font-extrabold text-slate-800 mt-0.5">--/--</p></div>
+                    <div><p class="text-[10px] font-bold text-slate-400 uppercase">Custo Médio</p><p id="diaperAvgUnitCost" class="text-sm font-extrabold text-indigo-600 mt-0.5">R$ 0,00/un</p></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" data-action="consume-one" class="bg-slate-900 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 active:scale-95 transition"><i data-lucide="minus-circle" class="w-4 h-4"></i> Usar 1 Fralda (-1)</button>
+                    <button type="button" data-action="consume-batch" class="bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 active:scale-95 transition border border-indigo-200"><i data-lucide="calendar-minus" class="w-4 h-4"></i> Baixar Dia (<span id="btnDailyRateLabel">-7</span>)</button>
+                </div>
+            </div>
+
+            <div data-action="open-comparator" class="cursor-pointer bg-amber-500 text-white p-3.5 rounded-2xl shadow-sm flex items-center justify-between active:scale-98 transition">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/20 p-2 rounded-xl"><i data-lucide="scale" class="w-5 h-5 text-white"></i></div>
+                    <div><h4 class="font-extrabold text-xs">Comparador de Pacotes de Fralda</h4><p class="text-[11px] text-amber-100">Compare 2 pacotes no mercado e veja qual compensa</p></div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="card p-4 flex flex-col justify-between">
+                    <div><span class="text-[10px] font-bold text-slate-400 uppercase">Ritmo Diário</span><p class="text-lg font-extrabold text-slate-800 mt-0.5"><span id="dailyRateDisplay">7</span> tiras/dia</p><p id="dailyCostEstimate" class="text-[11px] text-slate-400">~R$ 0,00/dia</p></div>
+                    <button type="button" data-action="edit-diaper-rate" class="mt-3 w-full bg-slate-100 text-slate-700 text-xs font-bold py-2 rounded-xl">Ajustar Média</button>
+                </div>
+                <div class="bg-gradient-to-br from-indigo-600 to-violet-700 text-white p-4 rounded-2xl shadow-md flex flex-col justify-between">
+                    <div><span class="text-[10px] font-bold text-indigo-200 uppercase">Abastecer</span><p class="text-sm font-extrabold mt-0.5">Comprou pacote?</p></div>
+                    <button type="button" data-action="open-diaper-modal" class="mt-3 w-full bg-white text-indigo-700 text-xs font-extrabold py-2.5 rounded-xl flex items-center justify-center gap-1"><i data-lucide="package-plus" class="w-4 h-4"></i> Lançar Pacote</button>
+                </div>
+            </div>
+
+            <div class="card p-4">
+                <h3 class="font-extrabold text-xs uppercase tracking-wider text-slate-500 mb-3">Histórico de Pacotes & Custo/Tira</h3>
+                <div id="diaperPacksList" class="space-y-2.5"></div>
+            </div>
+        </section>
+
+        <!-- ABA 3: CRESCIMENTO -->
+        <section id="tab-growth" class="hidden space-y-4">
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <div><span class="text-[10px] font-extrabold uppercase text-sky-600">Biometria do Bebê</span><h2 class="font-extrabold text-base text-slate-800">Peso & Altura</h2></div>
+                    <div class="flex gap-2">
+                        <button type="button" data-action="open-sos-modal" class="bg-rose-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1"><i data-lucide="thermometer" class="w-3.5 h-3.5"></i> SOS Febre</button>
+                        <button type="button" data-action="open-growth-modal" class="bg-sky-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Medir</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-sky-50/70 border border-sky-100 p-3 rounded-2xl"><span class="text-[10px] font-bold text-sky-700 uppercase">Último Peso</span><div class="text-xl font-extrabold text-slate-800 mt-0.5" id="lastWeightDisplay">-- kg</div><p class="text-[10px] text-sky-600 font-bold mt-0.5" id="weightDeltaDisplay">Sem histórico</p></div>
+                    <div class="bg-indigo-50/70 border border-indigo-100 p-3 rounded-2xl"><span class="text-[10px] font-bold text-indigo-700 uppercase">Última Altura</span><div class="text-xl font-extrabold text-slate-800 mt-0.5" id="lastHeightDisplay">-- cm</div><p class="text-[10px] text-indigo-600 font-bold mt-0.5" id="heightDeltaDisplay">Sem histórico</p></div>
+                </div>
+                <div class="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex items-center justify-between">
+                    <div><p class="text-[11px] font-bold text-slate-700">🧷 Fralda Recomendada pelo Peso</p><p class="text-[10px] text-slate-400" id="diaperSizeReason">Registre o peso para ver a faixa ideal</p></div>
+                    <span id="recommendedDiaperBadge" class="bg-indigo-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-lg">--</span>
+                </div>
+            </div>
+            <div class="card p-4">
+                <h3 class="font-extrabold text-xs uppercase tracking-wider text-slate-500 mb-2">Curva de Evolução</h3>
+                <div class="relative h-52 flex items-center justify-center"><canvas id="growthChart"></canvas><div id="emptyGrowthChartMsg" class="hidden absolute inset-0 flex items-center justify-center text-slate-400 text-xs">Adicione medições para ver o gráfico</div></div>
+            </div>
+            <div class="card p-4"><h3 class="font-extrabold text-xs uppercase tracking-wider text-slate-500 mb-3">Histórico de Medições</h3><div id="growthHistoryList" class="space-y-2"></div></div>
+        </section>
+
+        <!-- ABA 4: EXTRATO -->
+        <section id="tab-history" class="hidden space-y-3.5">
+            <div class="card p-3.5">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Divisão por Pagamento no Mês</span>
+                    <span class="text-[10px] font-bold text-indigo-600">Scanner: <strong id="memorizedCountBadge">0</strong> produtos</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between"><span>💳 Crédito:</span><strong id="payCreditVal">R$ 0,00</strong></div>
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between"><span>⚡ Pix/Débito:</span><strong id="payInstantVal">R$ 0,00</strong></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <h2 class="font-extrabold text-sm text-slate-800">Lançamentos do Mês</h2>
+                <div class="flex gap-1.5">
+                    <button type="button" data-action="rescue-data" class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Resgatar Dados</button>
+                    <button type="button" data-action="export-csv" class="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1"><i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> CSV</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-5 gap-2">
+                <input type="text" id="historySearchInput" placeholder="🔍 Buscar produto ou código..." class="col-span-3 inp !py-2 !text-xs">
+                <select id="historyCategoryFilter" class="col-span-2 inp !py-2 !text-xs">
+                    <option value="ALL">Todas</option><option value="Fraldas & Higiene">🧷 Fraldas</option><option value="Alimentação">🍼 Alimentação</option>
+                    <option value="Saúde & Farmácia">💊 Saúde</option><option value="Roupas & Enxoval">👕 Roupas</option><option value="Móveis & Passeio">🛒 Móveis</option>
+                    <option value="Brinquedos & Educação">🧸 Brinquedos</option><option value="Outros">📦 Outros</option>
+                </select>
+            </div>
+            <div id="transactionsList" class="space-y-2.5"></div>
+        </section>
+    </main>
+
+    <!-- BARRA INFERIOR FLUTUANTE -->
+    <nav class="fixed bottom-3 left-3 right-3 z-30 pointer-events-none">
+        <div id="bottomDock" class="max-w-md mx-auto bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl shadow-2xl flex justify-between items-center h-16 px-5 pointer-events-auto">
+            <button type="button" data-action="switch-tab" data-tab="dashboard" id="nav-dashboard" class="flex flex-col items-center justify-center w-14 text-indigo-600 font-bold"><i data-lucide="layout-dashboard" class="w-5 h-5 mb-0.5"></i><span class="text-[10px]">Resumo</span></button>
+            <button type="button" data-action="switch-tab" data-tab="diapers" id="nav-diapers" class="flex flex-col items-center justify-center w-14 text-slate-400 font-medium"><i data-lucide="package-check" class="w-5 h-5 mb-0.5"></i><span class="text-[10px]">Fraldas</span></button>
+            <button type="button" data-action="open-expense-modal" class="bg-gradient-to-tr from-indigo-600 to-violet-600 text-white w-14 h-14 rounded-2xl shadow-lg shadow-indigo-500/30 flex items-center justify-center -mt-6 border-4 border-white active:scale-95 transition"><i data-lucide="plus" class="w-7 h-7"></i></button>
+            <button type="button" data-action="switch-tab" data-tab="growth" id="nav-growth" class="flex flex-col items-center justify-center w-14 text-slate-400 font-medium"><i data-lucide="ruler" class="w-5 h-5 mb-0.5"></i><span class="text-[10px]">Peso/Alt</span></button>
+            <button type="button" data-action="switch-tab" data-tab="history" id="nav-history" class="flex flex-col items-center justify-center w-14 text-slate-400 font-medium"><i data-lucide="list-ordered" class="w-5 h-5 mb-0.5"></i><span class="text-[10px]">Extrato</span></button>
+        </div>
+    </nav>
+</div>
+
+<!-- MODAL CONFIGURAÇÕES & PERFIS -->
+<div id="settingsModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <div><h3 class="font-extrabold text-base text-slate-800">Configurações & Perfis</h3><p class="text-[11px] text-slate-400" id="settingsFamilySubtitle">Conta Familiar</p></div>
+            <button type="button" data-action="close-settings" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="space-y-2">
+            <div class="flex justify-between items-center"><span class="lbl !mb-0 !text-indigo-600">1. Perfis das Crianças</span><button type="button" data-action="open-child-modal" class="bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-1"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> + Cadastrar</button></div>
+            <div id="childrenProfilesList" class="space-y-2"></div>
+        </div>
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+            <span class="lbl">2. Conta, Segurança & Sessão</span>
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-2.5">
+                <div class="flex justify-between items-center"><div><p class="text-xs font-bold text-slate-800">Responsável</p><p class="text-[11px] text-slate-500" id="parentNameDisplay">Família</p></div><button type="button" data-action="edit-parent-name" class="text-xs font-bold text-indigo-600 underline">Editar</button></div>
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
+                    <button type="button" data-action="configure-pin" class="card !rounded-xl text-xs font-bold py-2.5 flex items-center justify-center gap-1.5"><i data-lucide="key-round" class="w-4 h-4 text-indigo-600"></i> Senha PIN</button>
+                    <button type="button" data-action="lock-session-now" class="bg-rose-600 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="log-out" class="w-4 h-4"></i> Bloquear / Sair</button>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+            <button type="button" data-action="toggle-dark" class="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="moon" class="w-4 h-4 text-indigo-600"></i> Modo Noturno</button>
+            <button type="button" data-action="rescue-data" class="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Resgatar Dados</button>
+        </div>
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+            <span class="lbl">3. Backup & Portabilidade</span>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" data-action="backup-json" class="bg-indigo-600 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="cloud-download" class="w-4 h-4"></i> Salvar Backup</button>
+                <button type="button" data-action="restore-json" class="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i data-lucide="cloud-upload" class="w-4 h-4"></i> Restaurar</button>
+                <input type="file" id="restoreFileInput" accept=".json" class="hidden">
+            </div>
+            <div class="flex justify-between items-center pt-2 text-[11px]">
+                <a href="privacidade.html" target="_blank" class="font-semibold text-indigo-600 underline">Política de Privacidade</a>
+                <button type="button" data-action="clear-all" class="font-bold text-rose-600 underline">Zerar Perfil Atual</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CADASTRO CRIANÇA -->
+<div id="childModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[60] hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-3.5">
+        <div class="flex justify-between items-center"><h3 class="font-extrabold text-base text-slate-800" id="childModalTitle">Cadastrar Criança</h3><button type="button" data-action="close-child-modal" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <form id="childForm" class="space-y-3">
+            <input type="hidden" id="childEditId"><input type="hidden" id="childPhotoData">
+            <div class="flex items-center gap-3.5">
+                <div id="childModalAvatarPreview" class="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">👶</div>
+                <button type="button" data-action="pick-child-photo" class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"><i data-lucide="camera" class="w-4 h-4"></i> Foto do Bebê</button>
+            </div>
+            <div><label class="lbl">Nome da Criança</label><input type="text" id="childNameInput" maxlength="50" required placeholder="Ex: Arthur / Helena" class="inp"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Nascimento</label><input type="date" id="childBirthInput" required class="inp"></div>
+                <div><label class="lbl">Ícone</label><select id="childGenderInput" class="inp"><option value="👦">👦 Menino</option><option value="👧">👧 Menina</option><option value="👶">👶 Bebê</option></select></div>
+            </div>
+            <div><label class="lbl">Meta Mensal (R$)</label><input type="number" step="0.01" min="1" id="childBudgetInput" required value="1500.00" class="inp"></div>
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md">Salvar Perfil</button>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DESPESA -->
+<div id="expenseModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-extrabold text-base text-slate-800" id="expModalTitle">Nova Despesa</h3><button type="button" data-action="close-expense-modal" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <div class="grid grid-cols-3 gap-2 mb-3">
+            <button type="button" data-action="scan-for-expense" class="col-span-2 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs"><i data-lucide="scan-barcode" class="w-4 h-4 text-emerald-600"></i> Ler Código</button>
+            <button type="button" data-action="photo-for-expense" class="bg-indigo-50 border border-indigo-200 text-indigo-800 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 text-xs"><i data-lucide="camera" class="w-4 h-4 text-indigo-600"></i> + Foto</button>
+        </div>
+        <form id="expenseForm" class="space-y-3">
+            <input type="hidden" id="expEditId"><input type="hidden" id="expBarcode"><input type="hidden" id="expPhotoData">
+            <div id="expBarcodeBadge" class="hidden bg-slate-100 text-slate-700 text-[11px] font-medium p-2.5 rounded-xl flex items-center gap-3">
+                <img id="expPhotoPreview" src="" alt="Foto" class="hidden w-11 h-11 rounded-lg object-cover border border-slate-300 flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-center"><span class="truncate">Código: <strong id="expBarcodeText" class="font-mono">Sem código</strong></span><button type="button" data-action="clear-code-expense" class="text-[10px] text-slate-400 underline ml-2">Limpar</button></div>
+                    <span id="expBarcodeStatus" class="block text-[11px] font-bold text-indigo-600 mt-0.5"></span>
+                </div>
+            </div>
+            <div><label class="lbl">Descrição / Produto</label><input type="text" id="expDesc" maxlength="120" required placeholder="Ex: Carrinho / Pomada / Consulta" class="inp"></div>
+            <div class="grid grid-cols-3 gap-2.5">
+                <div class="col-span-2"><label class="lbl">Valor (R$)</label><input type="number" step="0.01" min="0.01" id="expAmount" required placeholder="0,00" class="inp !text-lg !font-extrabold"></div>
+                <div id="expInstallmentsBox">
+                    <label class="lbl">Parcelas</label>
+                    <select id="expInstallments" class="inp !px-2"><option value="1">1x (À vista)</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="6">6x</option><option value="10">10x</option><option value="12">12x</option></select>
+                </div>
+            </div>
+            <div><label class="lbl">Categoria</label><select id="expCategory" required class="inp"><option value="Fraldas & Higiene">🧷 Fraldas & Higiene</option><option value="Alimentação">🍼 Alimentação</option><option value="Saúde & Farmácia">💊 Saúde & Farmácia</option><option value="Roupas & Enxoval">👕 Roupas & Enxoval</option><option value="Móveis & Passeio">🛒 Móveis & Passeio</option><option value="Brinquedos & Educação">🧸 Brinquedos & Educação</option><option value="Outros">📦 Outros</option></select></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Data</label><input type="date" id="expDate" required class="inp"></div>
+                <div><label class="lbl">Pagamento</label><select id="expPayment" class="inp"><option value="Pix">Pix</option><option value="Cartão de Crédito">Crédito</option><option value="Cartão de Débito">Débito</option><option value="Dinheiro">Dinheiro</option></select></div>
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-md">Salvar Lançamento</button>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL PACOTE FRALDAS -->
+<div id="diaperModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-3"><div><h3 class="font-extrabold text-base text-slate-800">Novo Pacote de Fraldas</h3><p class="text-[11px] text-slate-400">Soma no estoque e calcula custo/tira</p></div><button type="button" data-action="close-diaper-modal" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <div class="grid grid-cols-3 gap-2 mb-3">
+            <button type="button" data-action="scan-for-diaper" class="col-span-2 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs"><i data-lucide="scan-barcode" class="w-4 h-4 text-emerald-600"></i> Ler Código</button>
+            <button type="button" data-action="photo-for-diaper" class="bg-indigo-50 border border-indigo-200 text-indigo-800 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1 text-xs"><i data-lucide="camera" class="w-4 h-4 text-indigo-600"></i> + Foto</button>
+        </div>
+        <form id="diaperForm" class="space-y-3">
+            <input type="hidden" id="dpBarcode"><input type="hidden" id="dpPhotoData">
+            <div id="dpBarcodeBadge" class="hidden bg-slate-100 text-slate-700 text-[11px] font-medium p-2.5 rounded-xl flex items-center gap-3">
+                <img id="dpPhotoPreview" src="" alt="Foto" class="hidden w-11 h-11 rounded-lg object-cover border border-slate-300 flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-center"><span class="truncate">Código: <strong id="dpBarcodeText" class="font-mono">Sem código</strong></span><button type="button" data-action="clear-code-diaper" class="text-[10px] text-slate-400 underline ml-2">Limpar</button></div>
+                    <span id="dpBarcodeStatus" class="block text-[11px] font-bold text-indigo-600 mt-0.5"></span>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2.5">
+                <div class="col-span-2"><label class="lbl">Marca / Modelo</label><input type="text" id="dpBrand" maxlength="80" required placeholder="Ex: Pampers Confort" class="inp"></div>
+                <div><label class="lbl">Tamanho</label><select id="dpSize" class="inp"><option value="RN">RN</option><option value="P">P</option><option value="M" selected>M</option><option value="G">G</option><option value="XG">XG</option><option value="XXG">XXG</option></select></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Qtd. Tiras</label><input type="number" min="1" max="500" id="dpUnits" required placeholder="Ex: 72" class="inp !text-base !font-extrabold"></div>
+                <div><label class="lbl">Preço Pago (R$)</label><input type="number" step="0.01" min="0.01" id="dpPrice" required placeholder="Ex: 119,90" class="inp !text-base !font-extrabold"></div>
+            </div>
+            <div class="bg-indigo-50 border border-indigo-100 p-2.5 rounded-xl flex justify-between items-center"><span class="text-xs font-semibold text-indigo-800">Custo por tira:</span><span id="dpCostPreview" class="text-sm font-extrabold text-indigo-700">R$ 0,00 / un</span></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Data</label><input type="date" id="dpDate" required class="inp"></div>
+                <div><label class="lbl">Pagamento</label><select id="dpPayment" class="inp"><option value="Pix">Pix</option><option value="Cartão de Crédito">Crédito</option><option value="Cartão de Débito">Débito</option><option value="Dinheiro">Dinheiro</option></select></div>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-slate-600 font-medium pt-1"><input type="checkbox" id="dpAddExpense" checked class="rounded text-indigo-600 w-4 h-4"> Lançar também no resumo financeiro</label>
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-md">Confirmar Entrada</button>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL PESO E ALTURA -->
+<div id="growthModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl">
+        <div class="flex justify-between items-center mb-4"><h3 class="font-extrabold text-base text-slate-800">Registrar Peso e Altura</h3><button type="button" data-action="close-growth-modal" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <form id="growthForm" class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="lbl">Peso (kg)</label><input type="number" step="0.01" min="0.5" max="60" id="grWeight" required placeholder="Ex: 6.45" class="inp !text-lg !font-extrabold"></div>
+                <div><label class="lbl">Altura (cm)</label><input type="number" step="0.1" min="20" max="180" id="grHeight" required placeholder="Ex: 62.5" class="inp !text-lg !font-extrabold"></div>
+            </div>
+            <div><label class="lbl">Data</label><input type="date" id="grDate" required class="inp"></div>
+            <div><label class="lbl">Observação</label><input type="text" id="grNote" maxlength="100" placeholder="Ex: Consulta pediatra" class="inp"></div>
+            <button type="submit" class="w-full bg-sky-600 text-white font-bold py-3.5 rounded-xl shadow-md">Salvar Medição</button>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL COMPARADOR -->
+<div id="comparatorModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center"><h3 class="font-extrabold text-base text-slate-800">⚖️ Qual Pacote Compensa Mais?</h3><button type="button" data-action="close-comparator" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">Opção A</span>
+                <input type="number" step="0.01" id="compPriceA" placeholder="Preço R$" class="inp !bg-white">
+                <input type="number" id="compUnitsA" placeholder="Qtd (Tiras/g)" class="inp !bg-white">
+                <p id="compResultA" class="text-xs font-extrabold text-slate-500">R$ 0,00 / un</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+                <span class="bg-sky-100 text-sky-700 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">Opção B</span>
+                <input type="number" step="0.01" id="compPriceB" placeholder="Preço R$" class="inp !bg-white">
+                <input type="number" id="compUnitsB" placeholder="Qtd (Tiras/g)" class="inp !bg-white">
+                <p id="compResultB" class="text-xs font-extrabold text-slate-500">R$ 0,00 / un</p>
+            </div>
+        </div>
+        <div id="compVerdictBox" class="bg-slate-100 p-3.5 rounded-2xl text-center">
+            <p id="compVerdictTitle" class="text-xs font-bold text-slate-500">Preencha os dois lados para comparar</p>
+            <p id="compVerdictSub" class="text-[11px] text-slate-400 mt-0.5"></p>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SOS FEBRE -->
+<div id="sosModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center">
+    <div class="modal-box bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto space-y-3.5">
+        <div class="flex justify-between items-center"><h3 class="font-extrabold text-base text-slate-800">🌡️ SOS Febre & Medicação</h3><button type="button" data-action="close-sos-modal" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-[10px] text-amber-800"><strong>Aviso:</strong> Referência usual de 1 gota/kg. Confirme sempre a prescrição do pediatra.</div>
+        <div class="grid grid-cols-2 gap-3">
+            <div><label class="lbl">Peso (kg)</label><input type="number" step="0.1" id="sosWeightInput" placeholder="Ex: 8.5" class="inp !font-extrabold"></div>
+            <div><label class="lbl">Medicamento</label><select id="sosMedSelect" class="inp !text-xs"><option value="Paracetamol Gotas">Paracetamol (6h/6h)</option><option value="Dipirona Gotas">Dipirona (6h/6h)</option><option value="Ibuprofeno 50mg/ml">Ibuprofeno (8h/8h)</option></select></div>
+        </div>
+        <div class="bg-rose-50 border border-rose-200 p-3 rounded-2xl flex justify-between items-center">
+            <div><span class="text-[10px] font-bold uppercase text-rose-600">Dose Estimada</span><p id="sosDropsOutput" class="text-xl font-extrabold text-rose-700">-- gotas</p></div>
+            <strong id="sosIntervalOutput" class="text-xs font-bold text-rose-800">A cada 6 horas</strong>
+        </div>
+        <form id="sosLogForm" class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+            <input type="number" step="0.1" id="sosTempInput" placeholder="Temp. ex: 38.2 °C" class="inp !text-xs">
+            <button type="submit" class="bg-rose-600 text-white text-xs font-bold py-2.5 px-3 rounded-xl">+ Gravar Horário</button>
+        </form>
+        <div id="sosHistoryList" class="space-y-2 max-h-40 overflow-y-auto"></div>
+    </div>
+</div>
+
+<!-- MODAL SCANNER -->
+<div id="scannerModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex flex-col items-center justify-center p-4">
+    <div class="modal-box bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-3.5">
+        <div class="flex justify-between items-center"><h3 class="font-bold text-sm text-slate-800">📷 Aponte para o Código de Barras</h3><button type="button" data-action="stop-scanner" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+        <div id="barcode-reader" class="w-full overflow-hidden rounded-2xl bg-slate-900 min-h-[220px] flex items-center justify-center text-white text-xs">Iniciando câmera...</div>
+        <p id="scannerStatusMsg" class="text-xs text-center text-slate-500">Posicione o código de barras no centro.</p>
+        <div class="pt-2 border-t border-slate-100 flex gap-2">
+            <input type="text" id="manualBarcodeInput" maxlength="32" placeholder="Ou digite os números..." class="inp !py-2 !text-xs flex-1">
+            <button type="button" data-action="manual-barcode" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl">Buscar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+const fmt=v=>(Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const normCode=r=>r?String(r).trim().replace(/[^0-9a-zA-Z]/g,''):'';
+
+const CATS=Object.freeze({
+    'Fraldas & Higiene':{icon:'🧷',color:'#4f46e5',bg:'bg-indigo-50'},
+    'Alimentação':{icon:'🍼',color:'#0ea5e9',bg:'bg-sky-50'},
+    'Saúde & Farmácia':{icon:'💊',color:'#ef4444',bg:'bg-red-50'},
+    'Roupas & Enxoval':{icon:'👕',color:'#f59e0b',bg:'bg-amber-50'},
+    'Móveis & Passeio':{icon:'🛒',color:'#10b981',bg:'bg-emerald-50'},
+    'Brinquedos & Educação':{icon:'🧸',color:'#8b5cf6',bg:'bg-purple-50'},
+    'Outros':{icon:'📦',color:'#64748b',bg:'bg-slate-100'}
+});
+
+// Chaves de armazenamento (Novas e Antigas para Resgate Total)
+const K_PROF='baby_finance_profiles_v4';
+const K_CAT='baby_finance_barcode_catalog_v1';
+const K_DARK='baby_finance_dark_mode_v1';
+const K_PIN='baby_finance_pin_hash_v1';
+const K_EXP_V1='baby_finance_expenses_v1';
+const K_BUD_V1='baby_finance_budget_v1';
+const K_DIA_V1='baby_finance_diaper_state_v1';
+const K_GRO_V1='baby_finance_growth_v1';
+const K_SOS_V1='baby_finance_sos_logs_v1';
+
+let appState={activeChildId:'child_1',parentName:'Família',children:[]};
+let expenses=[],monthlyBudget=1500,diaperState={currentStock:0,dailyUsage:7,packs:[]},growthRecords=[],sosLogs=[],barcodeCatalog={};
+let chartInst=null,growthChartInst=null,qrReader=null,scanTarget='expense',photoTarget='expense',pinInput='';
+
+$('pinDotsBox').innerHTML=[0,1,2,3].map(i=>`<div id="dot-${i}" class="w-3.5 h-3.5 rounded-full border-2 border-indigo-400 transition-all"></div>`).join('');
+$('pinPadGrid').innerHTML=[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(v=>v===''?'<div></div>':v==='⌫'
+    ?`<button type="button" data-action="pin-clear" class="bg-rose-900/50 active:scale-95 text-xs font-bold py-3 rounded-2xl border border-rose-800/50">⌫</button>`
+    :`<button type="button" data-action="pin-key" data-val="${v}" class="bg-white/10 hover:bg-white/15 active:scale-95 text-lg font-extrabold py-3 rounded-2xl border border-white/10">${v}</button>`
+).join('');
+
+function toast(msg){
+    const b=$('toastBox');$('toastText').textContent=msg;b.classList.remove('hidden');
+    clearTimeout(b._t);b._t=setTimeout(()=>b.classList.add('hidden'),2800);
+}
+
+function ask({title,msg,hasInput=false,defaultVal='',inputType='text'}){
+    return new Promise(res=>{
+        const m=$('dialogModal'),inp=$('dialogInput');
+        $('dialogTitle').textContent=title;$('dialogMsg').textContent=msg;
+        if(hasInput){inp.type=inputType;inp.value=defaultVal;inp.classList.remove('hidden');setTimeout(()=>inp.focus(),60);}
+        else inp.classList.add('hidden');
+        m.classList.remove('hidden');
+        const end=v=>{m.classList.add('hidden');res(v);};
+        $('dialogCancelBtn').onclick=()=>end(null);
+        $('dialogOkBtn').onclick=()=>end(hasInput?inp.value:true);
+        inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();end(inp.value);}};
+    });
+}
+
+async function sha256(str){
+    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str+'_BF_SALT_2026'));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function calcAge(birthStr){
+    if(!birthStr)return 'Toque para configurar perfil';
+    const b=new Date(birthStr+'T00:00:00'),n=new Date();
+    if(isNaN(b.getTime())||b>n)return 'Recém-nascido';
+    let y=n.getFullYear()-b.getFullYear(),m=n.getMonth()-b.getMonth(),d=n.getDate()-b.getDate();
+    if(d<0){m--;d+=new Date(n.getFullYear(),n.getMonth(),0).getDate();}
+    if(m<0){y--;m+=12;}
+    return (y*12+m===0)?`${d}d de vida`:(y===0)?`${m}m${d>0?` e ${d}d`:''}`:`${y}a${m>0?` e ${m}m`:''}`;
+}
+
+function compressImg(file,max,cb){
+    const r=new FileReader();
+    r.onload=ev=>{
+        const img=new Image();
+        img.onload=()=>{
+            const c=document.createElement('canvas');let w=img.width,h=img.height;
+            if(w>h&&w>max){h*=max/w;w=max;}else if(h>max){w*=max/h;h=max;}
+            c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+            cb(c.toDataURL('image/jpeg',0.65));
+        };
+        img.src=ev.target.result;
+    };
+    r.readAsDataURL(file);
+}
+
+function applyPhoto(target,url){
+    if(!url)return;
+    const p=target==='expense'?'exp':'dp';
+    $(`${p}PhotoData`).value=url;
+    const img=$(`${p}PhotoPreview`);img.src=url;img.classList.remove('hidden');
+    $(`${p}BarcodeBadge`).classList.remove('hidden');
+    if(!$(`${p}BarcodeStatus`).textContent)$(`${p}BarcodeStatus`).textContent='📸 Foto do produto anexada!';
+}
+
+function updateDots(){
+    for(let i=0;i<4;i++)$(`dot-${i}`).className=i<pinInput.length?'w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-emerald-400 scale-110 transition-all':'w-3.5 h-3.5 rounded-full border-2 border-indigo-400 transition-all';
+}
+
+async function handlePin(d){
+    if(pinInput.length>=4)return;
+    pinInput+=d;$('pinErrorMsg').textContent='';updateDots();
+    if(pinInput.length===4){
+        if((await sha256(pinInput))===localStorage.getItem(K_PIN)){$('pinLockScreen').classList.add('hidden');pinInput='';updateDots();}
+        else{if(navigator.vibrate)navigator.vibrate(150);$('pinErrorMsg').textContent='PIN incorreto.';pinInput='';setTimeout(updateDots,250);}
+    }
+}
+
+async function configPin(){
+    const saved=localStorage.getItem(K_PIN);
+    if(saved){
+        const cur=await ask({title:'Verificar PIN',msg:'Digite seu PIN atual:',hasInput:true,inputType:'password'});
+        if(!cur)return;
+        if((await sha256(cur.trim()))!==saved)return toast('❌ PIN incorreto!');
+        if(!(await ask({title:'Gerenciar PIN',msg:'Confirmar para trocar o PIN, ou Cancelar para remover o bloqueio.'}))){
+            localStorage.removeItem(K_PIN);return toast('🔓 PIN removido.');
+        }
+    }
+    const np=await ask({title:'Novo PIN (4 dígitos)',msg:'Digite 4 números:',hasInput:true,inputType:'number'});
+    if(!np||!/^\d{4}$/.test(np.trim()))return toast('⚠️ Digite exatos 4 números.');
+    localStorage.setItem(K_PIN,await sha256(np.trim()));toast('🔒 PIN ativado!');
+}
+
+function curChild(){
+    if(!Array.isArray(appState.children)||appState.children.length===0){
+        appState.children=[{id:'child_1',name:'Meu Bebê',birthDate:'',gender:'👶',photo:'',monthlyBudget:1500,expenses:[],diaperState:{currentStock:0,dailyUsage:7,packs:[]},growthRecords:[],sosLogs:[]}];
+        appState.activeChildId='child_1';
+    }
+    let c=appState.children.find(x=>x.id===appState.activeChildId);
+    if(!c){c=appState.children[0];appState.activeChildId=c.id;}
+    return c;
+}
+
+function pullChild(){
+    const c=curChild();
+    monthlyBudget=Number(c.monthlyBudget)||1500;
+    expenses=Array.isArray(c.expenses)?c.expenses:[];
+    diaperState=c.diaperState&&typeof c.diaperState==='object'?c.diaperState:{currentStock:0,dailyUsage:7,packs:[]};
+    if(!Array.isArray(diaperState.packs))diaperState.packs=[];
+    growthRecords=Array.isArray(c.growthRecords)?c.growthRecords:[];
+    sosLogs=Array.isArray(c.sosLogs)?c.sosLogs:[];
+}
+
+function pushChild(){
+    const c=curChild();
+    c.monthlyBudget=monthlyBudget;c.expenses=expenses;c.diaperState=diaperState;c.growthRecords=growthRecords;c.sosLogs=sosLogs;
+}
+
+// MOTOR DE RESGATE AUTOMÁTICO DE DADOS DAS VERSÕES ANTERIORES (v1, v2, v3, v4)
+function rescueLegacyData(showMsg=false){
+    let rescuedCount=0;
+    try{
+        const legExp=JSON.parse(localStorage.getItem(K_EXP_V1)||'[]');
+        if(Array.isArray(legExp)){
+            legExp.forEach(item=>{
+                if(item&&item.id&&!expenses.some(e=>e.id===item.id)){expenses.push(item);rescuedCount++;}
+            });
+        }
+    }catch(e){}
+
+    try{
+        const legDia=JSON.parse(localStorage.getItem(K_DIA_V1)||'null');
+        if(legDia&&typeof legDia==='object'){
+            if(Array.isArray(legDia.packs)){
+                legDia.packs.forEach(pk=>{
+                    if(pk&&pk.id&&!diaperState.packs.some(p=>p.id===pk.id)){diaperState.packs.push(pk);rescuedCount++;}
+                });
+            }
+            if(diaperState.currentStock===0&&Number(legDia.currentStock)>0){
+                diaperState.currentStock=Number(legDia.currentStock);
+            }
+            if(Number(legDia.dailyUsage)>0)diaperState.dailyUsage=Number(legDia.dailyUsage);
+        }
+    }catch(e){}
+
+    try{
+        const legGro=JSON.parse(localStorage.getItem(K_GRO_V1)||'[]');
+        if(Array.isArray(legGro)){
+            legGro.forEach(g=>{
+                if(g&&g.id&&!growthRecords.some(x=>x.id===g.id)){growthRecords.push(g);rescuedCount++;}
+            });
+        }
+    }catch(e){}
+
+    try{
+        const legSos=JSON.parse(localStorage.getItem(K_SOS_V1)||'[]');
+        if(Array.isArray(legSos)){
+            legSos.forEach(s=>{
+                if(s&&s.id&&!sosLogs.some(x=>x.id===s.id)){sosLogs.push(s);rescuedCount++;}
+            });
+        }
+    }catch(e){}
+
+    // Reconstrói catálogo de códigos de barras a partir de todos os itens
+    appState.children.forEach(c=>{
+        (c.expenses||[]).forEach(x=>{const k=normCode(x.barcode);if(k)barcodeCatalog[k]={...(barcodeCatalog[k]||{}),desc:x.desc,category:x.category,lastPrice:x.amount,photo:x.photo||(barcodeCatalog[k]&&barcodeCatalog[k].photo)||''};});
+        ((c.diaperState&&c.diaperState.packs)||[]).forEach(p=>{const k=normCode(p.barcode);if(k)barcodeCatalog[k]={...(barcodeCatalog[k]||{}),desc:`Fralda ${p.brand} (${p.size} - ${p.units} un.)`,category:'Fraldas & Higiene',brand:p.brand,size:p.size,units:p.units,lastPrice:p.price,photo:p.photo||(barcodeCatalog[k]&&barcodeCatalog[k].photo)||''};});
+    });
+
+    saveData();
+
+    // Se o mês selecionado não tiver despesas, mas houver despesas em outro mês, aponta para o mês mais recente com dados
+    const curMo=$('monthFilter').value;
+    if(expenses.length>0&&!expenses.some(e=>e.date&&e.date.startsWith(curMo))){
+        const sortedDates=[...expenses].filter(e=>e.date).sort((a,b)=>new Date(b.date)-new Date(a.date));
+        if(sortedDates.length>0)$('monthFilter').value=sortedDates[0].date.substring(0,7);
+    }
+
+    if(showMsg||rescuedCount>0){
+        toast(rescuedCount>0?`✓ ${rescuedCount} registros antigos recuperados!`:'✓ Memória sincronizada e verificada!');
+    }
+}
+
+function loadData(){
+    try{
+        const cat=localStorage.getItem(K_CAT);if(cat)barcodeCatalog=JSON.parse(cat)||{};
+    }catch(e){barcodeCatalog={};}
+
+    try{
+        const prof=localStorage.getItem(K_PROF);
+        if(prof){
+            const parsed=JSON.parse(prof);
+            if(parsed&&Array.isArray(parsed.children)&&parsed.children.length>0)appState=parsed;
+        }
+    }catch(e){}
+
+    pullChild();
+    rescueLegacyData(false);
+}
+
+// Salva simultaneamente no formato Multi-Perfis (v4) e nas chaves originais (v1) para segurança dupla
+function saveData(){
+    pushChild();
+    localStorage.setItem(K_PROF,JSON.stringify(appState));
+    localStorage.setItem(K_CAT,JSON.stringify(barcodeCatalog));
+    localStorage.setItem(K_EXP_V1,JSON.stringify(expenses));
+    localStorage.setItem(K_BUD_V1,String(monthlyBudget));
+    localStorage.setItem(K_DIA_V1,JSON.stringify(diaperState));
+    localStorage.setItem(K_GRO_V1,JSON.stringify(growthRecords));
+    localStorage.setItem(K_SOS_V1,JSON.stringify(sosLogs));
+}
+
+function guessCat(txt){
+    const t=String(txt).toLowerCase();
+    if(t.includes('fralda')||t.includes('higiene')||t.includes('toalhita')||t.includes('lenço')||t.includes('shampoo')||t.includes('sabonete'))return 'Fraldas & Higiene';
+    if(t.includes('leite')||t.includes('fórmula')||t.includes('papinha')||t.includes('alimento')||t.includes('cereal')||t.includes('nestogeno')||t.includes('aptamil')||t.includes('nan'))return 'Alimentação';
+    if(t.includes('pomada')||t.includes('remédio')||t.includes('vitamina')||t.includes('soro')||t.includes('bepantol'))return 'Saúde & Farmácia';
+    return 'Fraldas & Higiene';
+}
+
+function extractUnits(txt){
+    const m=String(txt).match(/(\d+)\s*(un|unidades|tiras)/i);
+    return m?parseInt(m[1],10):'';
+}
+
+function clearCode(t){
+    const p=t==='expense'?'exp':'dp';
+    $(`${p}Barcode`).value='';$(`${p}PhotoData`).value='';$(`${p}PhotoPreview`).classList.add('hidden');$(`${p}BarcodeBadge`).classList.add('hidden');
+}
+
+function startScan(mode){
+    scanTarget=mode;$('manualBarcodeInput').value='';$('scannerModal').classList.remove('hidden');
+    if(qrReader)stopScan(false);
+    qrReader=new Html5Qrcode("barcode-reader");
+    qrReader.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:120}},txt=>{if(navigator.vibrate)navigator.vibrate(80);onBarcode(txt);},()=>{})
+    .catch(()=>{$('scannerStatusMsg').textContent='Autorize a câmera ou digite os números abaixo.';});
+}
+
+function stopScan(hide=true){
+    if(qrReader&&qrReader.isScanning)qrReader.stop().then(()=>{qrReader.clear();qrReader=null;}).catch(()=>{});
+    if(hide)$('scannerModal').classList.add('hidden');
+}
+
+function findKnownBarcode(code){
+    const cands=[code,code.replace(/^0+/,''),'0'+code];
+    for(const c of cands)if(barcodeCatalog[c])return barcodeCatalog[c];
+    for(const pk of diaperState.packs)if(cands.includes(normCode(pk.barcode)))return{desc:`Fralda ${pk.brand} (${pk.size} - ${pk.units} un.)`,category:'Fraldas & Higiene',brand:pk.brand,size:pk.size,units:pk.units,lastPrice:pk.price,photo:pk.photo||''};
+    for(const ex of expenses)if(cands.includes(normCode(ex.barcode)))return{desc:ex.desc,category:ex.category,brand:ex.desc,lastPrice:ex.amount,photo:ex.photo||''};
+    return null;
+}
+
+async function onBarcode(raw){
+    const code=normCode(raw);stopScan(true);
+    const p=scanTarget==='expense'?'exp':'dp';
+    $(`${p}Barcode`).value=code;$(`${p}BarcodeText`).textContent=code;
+    $(`${p}BarcodeBadge`).classList.remove('hidden');
+    const st=$(`${p}BarcodeStatus`);
+
+    const kn=findKnownBarcode(code);
+    if(kn){
+        st.textContent=`✓ Produto já cadastrado! ${kn.lastPrice?`(Último: ${fmt(kn.lastPrice)})`:''}`;
+        fillForm(kn);return;
+    }
+    st.textContent='Buscando produto na base online...';
+    for(const u of [`https://world.openfoodfacts.org/api/v0/product/${code}.json`,`https://world.openbeautyfacts.org/api/v0/product/${code}.json`,`https://world.openproductsfacts.org/api/v0/product/${code}.json`]){
+        try{
+            const r=await fetch(u);if(!r.ok)continue;
+            const d=await r.json();
+            if(d&&d.status===1&&d.product){
+                const pr=d.product,br=pr.brands?pr.brands.split(',')[0].trim():'',nm=pr.product_name_pt||pr.product_name||'';
+                const desc=[br,nm].filter(Boolean).join(' - ').trim().slice(0,100);
+                if(desc){
+                    const item={desc,category:guessCat(desc+' '+(pr.categories||'')),brand:br||desc,size:'M',units:extractUnits(desc+' '+(pr.quantity||'')),photo:pr.image_front_small_url||''};
+                    barcodeCatalog[code]=item;saveData();st.textContent='✓ Reconhecido online e memorizado!';fillForm(item);return;
+                }
+            }
+        }catch(e){}
+    }
+    st.textContent='Código novo! Preencha o nome e salve para memorizar.';
+}
+
+function fillForm(it){
+    if(scanTarget==='expense'){
+        if(it.desc)$('expDesc').value=it.desc;
+        if(it.category&&CATS[it.category])$('expCategory').value=it.category;
+        if(it.lastPrice)$('expAmount').value=it.lastPrice;
+        if(it.photo)applyPhoto('expense',it.photo);
+    }else{
+        if(it.brand||it.desc)$('dpBrand').value=it.brand||it.desc;
+        if(it.size)$('dpSize').value=it.size;
+        if(it.units)$('dpUnits').value=it.units;
+        if(it.lastPrice)$('dpPrice').value=it.lastPrice;
+        if(it.photo)applyPhoto('diaper',it.photo);
+        calcDpCost();
+    }
+}
+
+function calcDpCost(){
+    const u=parseFloat($('dpUnits').value),p=parseFloat($('dpPrice').value);
+    $('dpCostPreview').textContent=(u>0&&p>0)?`${fmt(p/u)} / tira`:'R$ 0,00 / un';
+}
+
+function calcSos(){
+    const w=parseFloat($('sosWeightInput').value),med=$('sosMedSelect').value;
+    $('sosIntervalOutput').textContent=med.includes('Ibuprofeno')?'A cada 8 horas':'A cada 6 horas';
+    $('sosDropsOutput').textContent=(!isNaN(w)&&w>0)?`~${Math.round(w)} gotas`:'-- gotas';
+}
+
+function renderSosList(){
+    const box=$('sosHistoryList');
+    if(!sosLogs.length){box.innerHTML=`<p class="text-xs text-slate-400 text-center py-2">Nenhuma dose registrada.</p>`;return;}
+    box.innerHTML=sosLogs.map(i=>`<div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs"><div><p class="font-bold text-slate-800">${esc(i.med)} • <span class="text-rose-600">${esc(i.drops)} gotas</span></p><p class="text-[10px] text-slate-500">${esc(i.timeFmt)} ${i.temp?`• 🌡️ ${esc(i.temp)}`:''} ${i.nextFmt?`• <strong>${esc(i.nextFmt)}</strong>`:''}</p></div><button type="button" data-action="delete-sos" data-id="${Number(i.id)}" class="text-slate-300 hover:text-rose-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>`).join('');
+    lucide.createIcons();
+}
+
+function openExpModal(editId=null){
+    $('expenseForm').reset();clearCode('expense');$('expEditId').value=editId||'';
+    if(editId){
+        const x=expenses.find(e=>e.id===editId);if(!x)return;
+        $('expModalTitle').textContent='Editar Lançamento';
+        $('expInstallmentsBox').classList.add('hidden');
+        $('expDesc').value=x.desc;$('expAmount').value=x.amount;$('expCategory').value=x.category;$('expDate').value=x.date;$('expPayment').value=x.payment;
+        if(x.barcode){$('expBarcode').value=x.barcode;$('expBarcodeText').textContent=x.barcode;$('expBarcodeBadge').classList.remove('hidden');}
+        if(x.photo)applyPhoto('expense',x.photo);
+    }else{
+        $('expModalTitle').textContent='Nova Despesa';
+        $('expInstallmentsBox').classList.remove('hidden');
+        $('expInstallments').value='1';
+        $('expDate').value=new Date().toISOString().split('T')[0];
+    }
+    $('expenseModal').classList.remove('hidden');
+}
+
+function renderSettings(){
+    $('parentNameDisplay').textContent=appState.parentName||'Família';
+    $('settingsFamilySubtitle').textContent=`Responsável: ${appState.parentName||'Família'}`;
+    $('childrenProfilesList').innerHTML=appState.children.map(c=>{
+        const act=c.id===appState.activeChildId;
+        const av=c.photo?`<img src="${esc(c.photo)}" class="w-10 h-10 rounded-xl object-cover">`:`<div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg">${esc(c.gender||'👶')}</div>`;
+        return `<div class="p-3 rounded-2xl border ${act?'border-indigo-500 bg-indigo-50/40':'border-slate-200 bg-slate-50/50'} flex items-center justify-between gap-2">
+            <div data-action="select-child" data-id="${esc(c.id)}" class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">${av}
+                <div class="min-w-0"><div class="flex items-center gap-1.5"><h4 class="font-extrabold text-xs text-slate-800 truncate">${esc(c.name)}</h4>${act?'<span class="bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded">ATIVO</span>':''}</div>
+                <p class="text-[11px] text-slate-500 truncate">${esc(calcAge(c.birthDate))} • Meta: ${fmt(c.monthlyBudget)}</p></div>
+            </div>
+            <div class="flex items-center gap-1"><button type="button" data-action="edit-child" data-id="${esc(c.id)}" class="text-slate-400 p-1.5"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+            ${appState.children.length>1?`<button type="button" data-action="delete-child" data-id="${esc(c.id)}" class="text-slate-300 hover:text-rose-500 p-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`:''}</div>
+        </div>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+function renderApp(){
+    const c=curChild();
+    if(c){
+        $('headerChildName').textContent=c.name;
+        $('budgetChildLabel').textContent=c.name.split(' ')[0];
+        $('headerChildAge').textContent=calcAge(c.birthDate);
+        $('headerChildAvatar').innerHTML=c.photo?`<img src="${esc(c.photo)}" class="w-full h-full object-cover">`:esc(c.gender||'👶');
+    }
+
+    const selMo=$('monthFilter').value;
+    const moExp=expenses.filter(e=>e.date&&e.date.startsWith(selMo));
+    const total=moExp.reduce((a,b)=>a+(Number(b.amount)||0),0);
+    const pct=monthlyBudget>0?Math.min((total/monthlyBudget)*100,100):0;
+    const realPct=monthlyBudget>0?((total/monthlyBudget)*100).toFixed(0):0;
+
+    const [yr,mo]=selMo.split('-').map(Number);
+    const prevDate=new Date(yr,mo-2,1);
+    const prevMoStr=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+    const prevTotal=expenses.filter(e=>e.date&&e.date.startsWith(prevMoStr)).reduce((a,b)=>a+(Number(b.amount)||0),0);
+    const momEl=$('momBadge');
+    if(prevTotal>0&&total>0){
+        const diffPct=(((total-prevTotal)/prevTotal)*100).toFixed(0);
+        momEl.textContent=`${diffPct>0?'↑ +':'↓ '}${diffPct}% vs mês ant.`;
+        momEl.className=`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${diffPct>0?'bg-rose-400/30 text-rose-100':'bg-emerald-400/30 text-emerald-100'}`;
+    }else{
+        momEl.textContent=`Total geral: ${expenses.length} lanç.`;
+        momEl.className='text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/15 text-indigo-100';
+    }
+
+    const daysInMo=new Date(yr,mo,0).getDate(),now=new Date();
+    const isCur=(now.getFullYear()===yr&&(now.getMonth()+1)===mo);
+    const elapsed=isCur?Math.max(1,now.getDate()):daysInMo;
+    const avg=total/elapsed,forecast=isCur?(avg*daysInMo):total;
+
+    $('totalSpentDisplay').textContent=fmt(total);
+    $('budgetDisplay').textContent=fmt(monthlyBudget);
+    $('budgetPercentDisplay').textContent=`${realPct}% da meta`;
+    $('dailyAvgDisplay').textContent=`${fmt(avg)}/dia`;
+    $('forecastDisplay').textContent=`Projeção: ${fmt(forecast)}`;
+    $('budgetBar').style.width=`${pct}%`;
+    $('budgetBar').className=`h-2 rounded-full transition-all duration-500 ${realPct>90?'bg-rose-400':realPct>75?'bg-amber-400':'bg-emerald-400'}`;
+
+    const credTotal=moExp.filter(e=>e.payment==='Cartão de Crédito').reduce((a,b)=>a+(Number(b.amount)||0),0);
+    $('payCreditVal').textContent=fmt(credTotal);
+    $('payInstantVal').textContent=fmt(total-credTotal);
+
+    const catMap={};Object.keys(CATS).forEach(k=>catMap[k]=0);
+    moExp.forEach(x=>{catMap[CATS[x.category]?x.category:'Outros']+=(Number(x.amount)||0);});
+    const sortedCats=Object.entries(catMap).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+    if(sortedCats.length>0){
+        const [tc,tv]=sortedCats[0];
+        $('topCatIcon').textContent=CATS[tc].icon;$('topCatName').textContent=tc;
+        $('topCatValue').textContent=`${fmt(tv)} acumulados`;$('topCatShare').textContent=`${((tv/total)*100).toFixed(1)}%`;
+    }else{
+        $('topCatIcon').textContent='📊';$('topCatName').textContent='Sem registros neste mês';
+        $('topCatValue').textContent='Toque no (+) ou mude o mês acima';$('topCatShare').textContent='0%';
+    }
+
+    $('memorizedCountBadge').textContent=Object.keys(barcodeCatalog).length;
+
+    if(chartInst)chartInst.destroy();
+    if(sortedCats.length===0)$('emptyChartMsg').classList.remove('hidden');
+    else{
+        $('emptyChartMsg').classList.add('hidden');
+        chartInst=new Chart($('doughnutChart').getContext('2d'),{
+            type:'doughnut',
+            data:{labels:sortedCats.map(i=>i[0]),datasets:[{data:sortedCats.map(i=>i[1]),backgroundColor:sortedCats.map(i=>CATS[i[0]].color),borderWidth:2}]},
+            options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{position:'right',labels:{boxWidth:10,font:{size:11}}}}}
+        });
+    }
+
+    $('categoryRankingList').innerHTML=sortedCats.length===0?`<p class="text-xs text-slate-400 text-center py-3">Sem movimentação neste mês.</p>`:sortedCats.map(([k,v])=>{
+        const p=((v/total)*100).toFixed(1),m=CATS[k];
+        return `<div class="space-y-1"><div class="flex justify-between text-xs"><span class="font-bold text-slate-700">${m.icon} ${esc(k)}</span><span class="font-extrabold text-slate-800">${fmt(v)} (${p}%)</span></div><div class="w-full bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full" style="width:${p}%;background:${m.color}"></div></div></div>`;
+    }).join('');
+
+    const fCat=$('historyCategoryFilter').value,q=$('historySearchInput').value.trim().toLowerCase();
+    const filt=moExp.filter(e=>(fCat==='ALL'||e.category===fCat)&&(!q||(e.desc&&e.desc.toLowerCase().includes(q))||(e.barcode&&e.barcode.includes(q)))).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    $('transactionsList').innerHTML=filt.length===0?`<div class="card p-6 text-center text-xs text-slate-400">Nenhum lançamento encontrado neste mês.</div>`:filt.map(it=>{
+        const m=CATS[it.category]||CATS['Outros'],ph=it.photo||(it.barcode&&barcodeCatalog[it.barcode]?barcodeCatalog[it.barcode].photo:'');
+        return `<div class="card p-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+                ${ph?`<img src="${esc(ph)}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 flex-shrink-0">`:`<div class="w-10 h-10 rounded-xl ${m.bg} flex items-center justify-center text-base flex-shrink-0">${m.icon}</div>`}
+                <div class="min-w-0"><h4 class="font-extrabold text-xs text-slate-800 truncate">${esc(it.desc)}</h4><p class="text-[10px] text-slate-400 mt-0.5">${esc((it.date||'').split('-').reverse().slice(0,2).join('/'))} • ${esc(it.category)} • ${esc(it.payment)} ${it.barcode?`• 🏷️ ${esc(it.barcode)}`:''}</p></div>
+            </div>
+            <div class="flex items-center gap-1 flex-shrink-0"><span class="font-extrabold text-xs text-slate-800 mr-1">${fmt(it.amount)}</span>
+                <button type="button" data-action="edit-expense" data-id="${Number(it.id)}" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                <button type="button" data-action="delete-expense" data-id="${Number(it.id)}" class="text-slate-300 hover:text-rose-500 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+
+    const st=Number(diaperState.currentStock)||0,rt=Number(diaperState.dailyUsage)||7,dLeft=Math.floor(st/rt);
+    const ed=new Date();ed.setDate(ed.getDate()+dLeft);
+    const edFmt=st>0?`${String(ed.getDate()).padStart(2,'0')}/${String(ed.getMonth()+1).padStart(2,'0')}`:'Zerado';
+    let tU=0,tP=0;diaperState.packs.forEach(p=>{tU+=(Number(p.units)||0);tP+=(Number(p.price)||0);});
+    const avgC=tU>0?(tP/tU):0;
+
+    $('diaperStockCount').textContent=st;$('diaperDaysLeft').textContent=`${dLeft} dias`;$('diaperEndDate').textContent=edFmt;
+    $('diaperAvgUnitCost').textContent=`${fmt(avgC)}/un`;$('dailyRateDisplay').textContent=rt;$('btnDailyRateLabel').textContent=`-${rt}`;
+    $('dailyCostEstimate').textContent=`~${fmt(avgC*rt)}/dia`;$('dashDiaperSummary').textContent=`${st} tiras (~${dLeft}d)`;
+    const dAl=$('dashDiaperAlert');
+    dAl.textContent=st===0?'Zerado':dLeft<=3?'Urgente':dLeft<=7?'Atenção':'OK';
+    dAl.className=`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${dLeft<=3?'bg-rose-100 text-rose-700':dLeft<=7?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}`;
+
+    const minC=diaperState.packs.length?Math.min(...diaperState.packs.map(p=>p.unitCost)):0;
+    $('diaperPacksList').innerHTML=diaperState.packs.length===0?`<p class="text-xs text-slate-400 text-center py-4">Nenhum pacote registrado.</p>`:diaperState.packs.map(pk=>{
+        const best=diaperState.packs.length>1&&Math.abs(pk.unitCost-minC)<0.005;
+        const ph=pk.photo||(pk.barcode&&barcodeCatalog[pk.barcode]?barcodeCatalog[pk.barcode].photo:'');
+        return `<div class="p-3 rounded-xl border ${best?'border-emerald-300 bg-emerald-50/40':'border-slate-200/80 bg-slate-50/50'} flex justify-between items-center gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">${ph?`<img src="${esc(ph)}" class="w-10 h-10 rounded-lg object-cover border flex-shrink-0">`:''}
+                <div class="min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><span class="bg-indigo-100 text-indigo-700 font-extrabold text-[10px] px-2 py-0.5 rounded">Tam. ${esc(pk.size)}</span><h4 class="font-bold text-xs text-slate-800 truncate">${esc(pk.brand)}</h4>${best?'<span class="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-1.5 py-0.5 rounded">MENOR CUSTO</span>':''}</div>
+                <p class="text-[11px] text-slate-500 mt-0.5">${esc((pk.date||'').split('-').reverse().slice(0,2).join('/'))} • <strong>${Number(pk.units)} tiras</strong> • ${fmt(pk.price)}</p></div>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0"><div class="text-right"><span class="block font-extrabold text-xs text-indigo-700">${fmt(pk.unitCost)}</span><span class="text-[10px] text-slate-400">por tira</span></div>
+            <button type="button" data-action="delete-pack" data-id="${Number(pk.id)}" class="text-slate-300 hover:text-rose-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
+        </div>`;
+    }).join('');
+
+    if(growthChartInst)growthChartInst.destroy();
+    if(growthRecords.length===0){
+        $('lastWeightDisplay').textContent='-- kg';$('lastHeightDisplay').textContent='-- cm';$('recommendedDiaperBadge').textContent='--';
+        $('diaperSizeReason').textContent='Registre o peso para ver a faixa ideal';$('dashGrowthSummary').textContent='Toque p/ medir';$('emptyGrowthChartMsg').classList.remove('hidden');$('growthHistoryList').innerHTML=`<p class="text-xs text-slate-400 text-center py-4">Nenhuma medição registrada.</p>`;
+    }else{
+        $('emptyGrowthChartMsg').classList.add('hidden');
+        const srt=[...growthRecords].sort((a,b)=>new Date(a.date)-new Date(b.date)),lat=srt[srt.length-1],prv=srt.length>1?srt[srt.length-2]:null;
+        $('lastWeightDisplay').textContent=`${Number(lat.weight).toFixed(2).replace('.',',')} kg`;
+        $('lastHeightDisplay').textContent=`${Number(lat.height).toFixed(1).replace('.',',')} cm`;
+        if(prv){
+            const wd=(lat.weight-prv.weight)*1000,hd=lat.height-prv.height;
+            $('weightDeltaDisplay').textContent=`${wd>=0?'+':''}${wd.toFixed(0)}g desde a última`;
+            $('heightDeltaDisplay').textContent=`${hd>=0?'+':''}${hd.toFixed(1).replace('.',',')} cm`;
+        }else{
+            $('weightDeltaDisplay').textContent='1ª medição';$('heightDeltaDisplay').textContent='1ª medição';
+        }
+        const w=lat.weight;
+        const rec=w<3.5?{s:'RN',r:'Até 3,5 kg'}:w<=5.5?{s:'P',r:'De 3,5 a 5,5 kg'}:w<=9?{s:'M',r:'De 5,5 a 9,0 kg'}:w<=12.5?{s:'G',r:'De 9,0 a 12,5 kg'}:w<=15?{s:'XG',r:'De 12,0 a 15,0 kg'}:{s:'XXG',r:'Acima de 14 kg'};
+        $('recommendedDiaperBadge').textContent=`Tam. ${rec.s}`;
+        $('diaperSizeReason').textContent=`Faixa ideal: ${rec.r}`;
+        $('dashGrowthSummary').textContent=`${Number(lat.weight).toFixed(2).replace('.',',')}kg • ${Number(lat.height).toFixed(1).replace('.',',')}cm`;
+        $('dashGrowthSuggestedSize').textContent=`Fralda ${rec.s}`;
+        $('growthHistoryList').innerHTML=[...srt].reverse().map(it=>`<div class="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 flex justify-between items-center"><div><span class="text-xs font-extrabold text-slate-800">${Number(it.weight).toFixed(2).replace('.',',')} kg • ${Number(it.height).toFixed(1).replace('.',',')} cm</span><p class="text-[11px] text-slate-400">${esc((it.date||'').split('-').reverse().join('/'))} ${it.note?`• ${esc(it.note)}`:''}</p></div><button type="button" data-action="delete-growth" data-id="${Number(it.id)}" class="text-slate-300 hover:text-rose-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join('');
+        growthChartInst=new Chart($('growthChart').getContext('2d'),{
+            type:'line',
+            data:{labels:srt.map(r=>(r.date||'').split('-').reverse().slice(0,2).join('/')),datasets:[{label:'Peso (kg)',data:srt.map(r=>r.weight),borderColor:'#0284c7',tension:0.3,yAxisID:'yW'},{label:'Altura (cm)',data:srt.map(r=>r.height),borderColor:'#4f46e5',borderDash:[4,4],tension:0.3,yAxisID:'yH'}]},
+            options:{responsive:true,maintainAspectRatio:false,scales:{yW:{position:'left'},yH:{position:'right',grid:{drawOnChartArea:false}}}}
+        });
+    }
+    lucide.createIcons();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+    if(localStorage.getItem(K_DARK)==='true')document.body.classList.add('dark-mode');
+    const now=new Date();$('monthFilter').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    $('monthFilter').addEventListener('change',renderApp);
+    $('historyCategoryFilter').addEventListener('change',renderApp);$('historySearchInput').addEventListener('input',renderApp);
+    $('dpUnits').addEventListener('input',calcDpCost);$('dpPrice').addEventListener('input',calcDpCost);
+
+    ['compPriceA','compUnitsA','compPriceB','compUnitsB'].forEach(id=>$(id).addEventListener('input',()=>{
+        const pA=parseFloat($('compPriceA').value),uA=parseFloat($('compUnitsA').value),pB=parseFloat($('compPriceB').value),uB=parseFloat($('compUnitsB').value);
+        const cA=(pA>0&&uA>0)?pA/uA:0,cB=(pB>0&&uB>0)?pB/uB:0;
+        $('compResultA').textContent=cA>0?`${fmt(cA)}/un`:'R$ 0,00/un';$('compResultB').textContent=cB>0?`${fmt(cB)}/un`:'R$ 0,00/un';
+        if(cA>0&&cB>0){
+            if(cA<cB){$('compVerdictTitle').textContent=`🏆 Opção A é ${(((cB-cA)/cB)*100).toFixed(1)}% mais barata!`;$('compVerdictSub').textContent=`Economia de ${fmt(cB-cA)} por unidade.`;}
+            else if(cB<cA){$('compVerdictTitle').textContent=`🏆 Opção B é ${(((cA-cB)/cA)*100).toFixed(1)}% mais barata!`;$('compVerdictSub').textContent=`Economia de ${fmt(cA-cB)} por unidade.`;}
+            else{$('compVerdictTitle').textContent='Empate!';$('compVerdictSub').textContent='';}
+        }
+    }));
+
+    $('sosWeightInput').addEventListener('input',calcSos);
+    $('sosMedSelect').addEventListener('change',calcSos);$('sosLogForm').addEventListener('submit',e=>{
+        e.preventDefault();const w=parseFloat($('sosWeightInput').value)||0,med=$('sosMedSelect').value,t=$('sosTempInput').value.trim(),n=new Date();
+        const hrs=med.includes('Ibuprofeno')?8:6,nxt=new Date(n.getTime()+hrs*3600000);
+        const tFmt=`${String(n.getDate()).padStart(2,'0')}/${String(n.getMonth()+1).padStart(2,'0')} às ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+        const nFmt=`Próxima: ${String(nxt.getHours()).padStart(2,'0')}:${String(nxt.getMinutes()).padStart(2,'0')}`;
+        sosLogs.unshift({id:Date.now(),med,drops:w>0?Math.round(w):'--',temp:t?`${t}°C`:'',timeFmt:tFmt,nextFmt:nFmt});
+        $('sosTempInput').value='';saveData();renderSosList();toast('✓ Dose registrada!');
+    });
+
+    $('productPhotoInput').addEventListener('change',e=>{if(e.target.files[0])compressImg(e.target.files[0],220,b64=>applyPhoto(photoTarget,b64));e.target.value='';});$('childPhotoInput').addEventListener('change',e=>{if(e.target.files[0])compressImg(e.target.files[0],200,b64=>{$('childPhotoData').value=b64;$('childModalAvatarPreview').innerHTML=`<img src="${b64}" class="w-full h-full object-cover">`;});e.target.value='';});
+
+    $('restoreFileInput').addEventListener('change',e=>{
+        const f=e.target.files[0];if(!f)return;
+        const r=new FileReader();
+        r.onload=ev=>{
+            try{
+                const p=JSON.parse(ev.target.result).payload;
+                if(p.appState)appState=p.appState;
+                else if(p.expenses){
+                    const c=curChild();c.expenses=p.expenses;c.diaperState=p.diaperState||c.diaperState;c.growthRecords=p.growthRecords||[];
+                }
+                if(p.barcodeCatalog)barcodeCatalog=p.barcodeCatalog;
+                pullChild();saveData();renderApp();toast('✓ Backup restaurado com sucesso!');
+            }catch(err){toast('❌ Arquivo inválido.');}
+        };
+        r.readAsText(f);e.target.value='';
+    });
+
+    $('expenseForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const editId=Number($('expEditId').value),amount=parseFloat($('expAmount').value),category=$('expCategory').value,desc=$('expDesc').value.trim().slice(0,120),date=$('expDate').value,payment=$('expPayment').value,inst=parseInt($('expInstallments').value,10)\vert{}\vert{}1,barcode=normCode($('expBarcode').value);
+        const photo=$('expPhotoData').value||(barcode&&barcodeCatalog[barcode]?barcodeCatalog[barcode].photo:'');
+        if(isNaN(amount)||amount<=0)return;
+        if(barcode)barcodeCatalog[barcode]={...(barcodeCatalog[barcode]||{}),desc,category,brand:desc,lastPrice:amount,photo:photo||''};
+        if(editId){
+            const idx=expenses.findIndex(x=>x.id===editId);if(idx>-1)expenses[idx]={...expenses[idx],amount,category,desc,date,payment,barcode,photo};
+            toast('✓ Lançamento atualizado!');
+        }else{
+            const base=new Date(date+'T12:00:00');
+            for(let i=0;i<inst;i++){
+                const d=new Date(base);d.setMonth(d.getMonth()+i);
+                expenses.unshift({id:Date.now()+i,amount,category,desc:inst>1?`${desc} (${i+1}/${inst})`:desc,date:d.toISOString().split('T')[0],payment,barcode,photo});
+            }
+            toast(inst>1?`✓ ${inst} parcelas lançadas!`:'✓ Despesa salva!');
+        }
+        saveData();$('expenseModal').classList.add('hidden');$('monthFilter').value=date.substring(0,7);renderApp();
+    });
+
+    $('diaperForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const brand=$('dpBrand').value.trim(),size=$('dpSize').value,units=parseInt($('dpUnits').value,10),price=parseFloat($('dpPrice').value),date=$('dpDate').value,payment=$('dpPayment').value,barcode=normCode($('dpBarcode').value);
+        const photo=$('dpPhotoData').value||(barcode&&barcodeCatalog[barcode]?barcodeCatalog[barcode].photo:''),fullDesc=`Fralda ${brand} (${size} - ${units} un.)`;
+        if(barcode)barcodeCatalog[barcode]={desc:fullDesc,category:'Fraldas & Higiene',brand,size,units,lastPrice:price,photo:photo||''};
+        diaperState.currentStock+=units;diaperState.packs.unshift({id:Date.now(),brand,size,units,price,unitCost:price/units,date,barcode,photo});
+        if($('dpAddExpense').checked){
+            expenses.unshift({id:Date.now()+1,amount:price,category:'Fraldas & Higiene',desc:fullDesc,date,payment,barcode,photo});
+            $('monthFilter').value=date.substring(0,7);
+        }
+        saveData();$('diaperModal').classList.add('hidden');renderApp();toast(`✓ +${units} fraldas no estoque!`);
+    });
+
+    $('growthForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        growthRecords.push({id:Date.now(),weight:parseFloat($('grWeight').value),height:parseFloat($('grHeight').value),date:$('grDate').value,note:$('grNote').value.trim()});
+        saveData();$('growthModal').classList.add('hidden');renderApp();toast('✓ Medição salva!');
+    });
+
+    $('childForm').addEventListener('submit',e=>{
+        e.preventDefault();pushChild();
+        const editId=$('childEditId').value,name=$('childNameInput').value.trim(),birthDate=$('childBirthInput').value,gender=$('childGenderInput').value,budget=parseFloat($('childBudgetInput').value)\vert{}\vert{}1500,photo=$('childPhotoData').value;
+        if(editId){const c=appState.children.find(x=>x.id===editId);if(c){c.name=name;c.birthDate=birthDate;c.gender=gender;c.monthlyBudget=budget;if(photo)c.photo=photo;}}
+        else{const id='child_'+Date.now();appState.children.push({id,name,birthDate,gender,photo:photo||'',monthlyBudget:budget,expenses:[],diaperState:{currentStock:0,dailyUsage:7,packs:[]},growthRecords:[],sosLogs:[]});appState.activeChildId=id;}
+        pullChild();saveData();$('childModal').classList.add('hidden');renderSettings();renderApp();toast('✓ Perfil salvo!');
+    });
+
+    document.body.addEventListener('click',async e=>{
+        const btn=e.target.closest('[data-action]');if(!btn)return;
+        const act=btn.getAttribute('data-action'),id=btn.getAttribute('data-id');
+        switch(act){
+            case 'rescue-data':rescueLegacyData(true);renderApp();break;
+            case 'open-settings':renderSettings();$('settingsModal').classList.remove('hidden');break;
+            case 'close-settings':$('settingsModal').classList.add('hidden');break;
+            case 'open-child-modal':
+                $('childForm').reset();$('childEditId').value='';$('childPhotoData').value='';$('childModalAvatarPreview').innerHTML='👶';
+                $('childBirthInput').value=new Date().toISOString().split('T')[0];$('childModal').classList.remove('hidden');break;
+            case 'edit-child':{
+                const c=appState.children.find(x=>x.id===id);if(!c)break;
+                $('childEditId').value=c.id;$('childNameInput').value=c.name;$('childBirthInput').value=c.birthDate||'';$('childGenderInput').value=c.gender\vert{}\vert{}'👶';$('childBudgetInput').value=c.monthlyBudget||1500;
+                $('childModalAvatarPreview').innerHTML=c.photo?`<img src="${esc(c.photo)}" class="w-full h-full object-cover">`:'👶';$('childModal').classList.remove('hidden');break;
+            }
+            case 'close-child-modal':$('childModal').classList.add('hidden');break;
+            case 'pick-child-photo':$('childPhotoInput').click();break;
+            case 'select-child':pushChild();appState.activeChildId=id;pullChild();saveData();renderApp();renderSettings();toast(`👶 Perfil: ${curChild().name}`);break;
+            case 'delete-child':
+                if(await ask({title:'Excluir Perfil',msg:'Remover este perfil de criança?'})){
+                    appState.children=appState.children.filter(c=>c.id!==id);appState.activeChildId=appState.children[0].id;
+                    pullChild();saveData();renderSettings();renderApp();
+                }break;
+            case 'edit-parent-name':{const v=await ask({title:'Responsável',msg:'Nome da família:',hasInput:true,defaultVal:appState.parentName});if(v){appState.parentName=v.trim();saveData();renderSettings();}break;}
+            case 'lock-session-now':
+                if(!localStorage.getItem(K_PIN))await configPin();
+                if(localStorage.getItem(K_PIN)){$('settingsModal').classList.add('hidden');$('lockFamilyTitle').textContent=appState.parentName\vert{}\vert{}'BabyFinance Pro';$('pinLockScreen').classList.remove('hidden');pinInput='';updateDots();}break;
+            case 'toggle-dark':{const d=document.body.classList.toggle('dark-mode');localStorage.setItem(K_DARK,d?'true':'false');toast(d?'🌙 Modo Noturno':'☀️ Modo Claro');break;}
+            case 'share-whatsapp':{
+                const c=curChild(),mo=$('monthFilter').value,tot=expenses.filter(x=>x.date&&x.date.startsWith(mo)).reduce((a,b)=>a+b.amount,0);
+                const txt=`👶 *Resumo BabyFinance — ${c?c.name:'Bebê'}* (${mo})\n💰 *Gasto:* ${fmt(tot)} (Meta: ${fmt(monthlyBudget)})\n🧷 *Estoque Fraldas:* ${diaperState.currentStock} tiras (~${Math.floor(diaperState.currentStock/(diaperState.dailyUsage||1))} dias)`;
+                if(navigator.share)navigator.share({text:txt}).catch(()=>{});else window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`,'_blank');
+                break;
+            }
+            case 'pin-key':handlePin(btn.getAttribute('data-val'));break;
+            case 'pin-clear':pinInput=pinInput.slice(0,-1);updateDots();break;
+            case 'configure-pin':configPin();break;
+            case 'edit-budget':{const v=await ask({title:'Meta Mensal (R$)',msg:'Novo valor da meta:',hasInput:true,defaultVal:monthlyBudget,inputType:'number'});if(v&&parseFloat(v)>0){monthlyBudget=parseFloat(v);saveData();renderApp();toast('✓ Meta atualizada!');}break;}
+            case 'switch-tab':
+                ['dashboard','diapers','growth','history'].forEach(t=>{
+                    $(`tab-${t}`).classList.toggle('hidden',t!==btn.getAttribute('data-tab'));
+                    $(`nav-${t}`).className=t===btn.getAttribute('data-tab')?'flex flex-col items-center justify-center w-14 text-indigo-600 font-bold':'flex flex-col items-center justify-center w-14 text-slate-400 font-medium';
+                });break;
+            case 'open-scan':openExpModal(null);startScan('expense');break;
+            case 'open-expense-modal':openExpModal(null);break;
+            case 'preset-expense':
+                openExpModal(null);$('expCategory').value=btn.getAttribute('data-cat');$('expDesc').value=btn.getAttribute('data-desc');
+                setTimeout(()=>$('expAmount').focus(),80);break;
+            case 'edit-expense':openExpModal(Number(id));break;
+            case 'close-expense-modal':$('expenseModal').classList.add('hidden');break;
+            case 'scan-for-expense':startScan('expense');break;
+            case 'photo-for-expense':photoTarget='expense';$('productPhotoInput').click();break;
+            case 'clear-code-expense':clearCode('expense');break;
+            case 'open-diaper-modal':$('diaperForm').reset();clearCode('diaper');$('dpCostPreview').textContent='R$ 0,00 / un';$('dpDate').value=new Date().toISOString().split('T')[0];$('diaperModal').classList.remove('hidden');break;
+            case 'close-diaper-modal':$('diaperModal').classList.add('hidden');break;
+            case 'scan-for-diaper':startScan('diaper');break;
+            case 'photo-for-diaper':photoTarget='diaper';$('productPhotoInput').click();break;
+            case 'clear-code-diaper':clearCode('diaper');break;
+            case 'manual-stock':{const v=await ask({title:'Saldo de Fraldas',msg:'Quantas tiras disponíveis hoje?',hasInput:true,defaultVal:diaperState.currentStock,inputType:'number'});if(v!==null&&parseInt(v,10)>=0){diaperState.currentStock=parseInt(v,10);saveData();renderApp();toast('✓ Estoque ajustado!');}break;}
+            case 'consume-one':diaperState.currentStock=Math.max(0,diaperState.currentStock-1);saveData();renderApp();toast('🧷 -1 fralda');break;
+            case 'consume-batch':diaperState.currentStock=Math.max(0,diaperState.currentStock-diaperState.dailyUsage);saveData();renderApp();toast(`🧷 -${diaperState.dailyUsage} fraldas`);break;
+            case 'edit-diaper-rate':{const v=await ask({title:'Média Diária',msg:'Quantas trocas por dia?',hasInput:true,defaultVal:diaperState.dailyUsage,inputType:'number'});if(v&&parseInt(v,10)>0){diaperState.dailyUsage=parseInt(v,10);saveData();renderApp();}break;}
+            case 'open-growth-modal':$('growthForm').reset();$('grDate').value=new Date().toISOString().split('T')[0];$('growthModal').classList.remove('hidden');break;
+            case 'close-growth-modal':$('growthModal').classList.add('hidden');break;
+            case 'open-comparator':$('comparatorModal').classList.remove('hidden');break;
+            case 'close-comparator':$('comparatorModal').classList.add('hidden');break;
+            case 'open-sos-modal':
+                if(growthRecords.length>0){const srt=[...growthRecords].sort((a,b)=>new Date(a.date)-new Date(b.date));$('sosWeightInput').value=srt[srt.length-1].weight;}
+                calcSos();renderSosList();$('sosModal').classList.remove('hidden');break;
+            case 'close-sos-modal':$('sosModal').classList.add('hidden');break;
+            case 'delete-sos':sosLogs=sosLogs.filter(x=>x.id!==Number(id));saveData();renderSosList();break;
+            case 'stop-scanner':stopScan(true);break;
+            case 'manual-barcode':{const c=normCode($('manualBarcodeInput').value);if(c.length>=3)onBarcode(c);else toast('⚠️ Código inválido.');break;}
+            case 'backup-json':{
+                pushChild();const b=new Blob([JSON.stringify({payload:{app:'BabyFinancePro',appState,barcodeCatalog}})],{type:'application/json'});
+                const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`backup_babyfinance_${new Date().toISOString().slice(0,10)}.json`;a.click();toast('☁️ Backup salvo!');break;
+            }
+            case 'restore-json':$('restoreFileInput').click();break;
+            case 'export-csv':{
+                if(!expenses.length)return toast('⚠️ Sem dados.');
+                let csv="data:text/csv;charset=utf-8,\uFEFFData;Categoria;Descricao;Pagamento;Codigo;Valor\n";
+                expenses.forEach(r=>{csv+=`${r.date};${r.category};${String(r.desc).replace(/;/g,',')};${r.payment};${r.barcode||''};${r.amount.toFixed(2).replace('.',',')}\n`;});
+                const a=document.createElement('a');a.href=encodeURI(csv);a.download='gastos_bebe.csv';a.click();break;
+            }
+            case 'clear-all':
+                if(await ask({title:'Zerar Perfil',msg:'Apagar todos os dados desta criança?'})){
+                    expenses=[];diaperState={currentStock:0,dailyUsage:7,packs:[]};growthRecords=[];sosLogs=[];saveData();renderApp();toast('🗑️ Dados apagados.');
+                }break;
+            case 'delete-expense':
+                if(await ask({title:'Excluir',msg:'Confirmar exclusão deste gasto?'})){expenses=expenses.filter(x=>x.id!==Number(id));saveData();renderApp();toast('🗑️ Excluído.');}break;
+            case 'delete-pack':
+                if(await ask({title:'Remover Pacote',msg:'Descontar tiras do saldo atual?'})){
+                    const pk=diaperState.packs.find(x=>x.id===Number(id));if(pk)diaperState.currentStock=Math.max(0,diaperState.currentStock-pk.units);
+                    diaperState.packs=diaperState.packs.filter(x=>x.id!==Number(id));saveData();renderApp();
+                }break;
+            case 'delete-growth':growthRecords=growthRecords.filter(x=>x.id!==Number(id));saveData();renderApp();break;
+        }
+    });
+
+    loadData();
+    if(localStorage.getItem(K_PIN)){$('pinLockScreen').classList.remove('hidden');updateDots();}
+    renderApp();
+});
+})();
+</script>
+</body>
+</html>
